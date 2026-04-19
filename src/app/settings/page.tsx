@@ -1,23 +1,20 @@
 "use client"
 
 import { 
-  Instagram, 
-  Twitter, 
-  Youtube, 
-  Linkedin, 
   Plus,
   CheckCircle2,
   Lock,
   Target,
   DollarSign
 } from "lucide-react"
+import { InstagramIcon, TwitterIcon, YoutubeIcon, LinkedinIcon } from "@/components/icons"
 
 const platforms = [
   { name: "TikTok", icon: "tiktok", connected: true, handle: "@viralforge_ai" },
-  { name: "Instagram", icon: Instagram, connected: true, handle: "@viralforge.prod" },
-  { name: "YouTube", icon: Youtube, connected: false },
-  { name: "X (Twitter)", icon: Twitter, connected: false },
-  { name: "LinkedIn", icon: Linkedin, connected: false },
+  { name: "Instagram", icon: InstagramIcon, connected: true, handle: "@viralforge.prod" },
+  { name: "YouTube", icon: YoutubeIcon, connected: false },
+  { name: "X (Twitter)", icon: TwitterIcon, connected: false },
+  { name: "LinkedIn", icon: LinkedinIcon, connected: false },
 ]
 
 export default function SettingsPage() {

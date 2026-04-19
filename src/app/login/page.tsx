@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
-import { BrainCircuit, ChevronRight, Github, Mail, Lock, Loader2 } from "lucide-react"
+import { BrainCircuit, ChevronRight, Mail, Lock, Loader2 } from "lucide-react"
+import { GithubIcon } from "@/components/icons"
 import Link from "next/link"
 import { motion } from "framer-motion"
 
@@ -127,7 +128,7 @@ export default function LoginPage() {
             onClick={() => handleOAuthLogin('github')}
             className="flex items-center justify-center gap-2 py-3 glass rounded-xl hover:bg-white/5 transition-all"
           >
-            <Github className="w-5 h-5" />
+            <GithubIcon className="w-5 h-5" />
             Github
           </button>
           <button 
