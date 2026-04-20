@@ -1,15 +1,15 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/client"
 import { 
   LayoutDashboard, 
   Zap, 
   Video, 
   TrendingUp, 
   Settings, 
-  Users,
   BrainCircuit,
   LogOut
 } from "lucide-react"
@@ -25,18 +25,28 @@ const menuItems = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const supabase = createClient()
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push("/login")
+    router.refresh()
+  }
 
   return (
     <div className="flex flex-col h-screen w-64 glass border-r border-white/5 sticky top-0">
       <div className="p-6">
-        <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-400">
-          ViralForge
-        </h1>
+        <Link href="/dashboard">
+          <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-400">
+            ViralForge
+          </h1>
+        </Link>
       </div>
 
       <nav className="flex-1 px-4 space-y-1">
         {menuItems.map((item) => {
-          const isActive = pathname === item.href
+          const isActive = pathname === item.href || pathname?.startsWith(item.href + "/")
           return (
             <Link
               key={item.href}
@@ -56,7 +66,10 @@ export function Sidebar() {
       </nav>
 
       <div className="p-4 border-t border-white/5">
-        <button className="flex items-center gap-3 px-4 py-3 w-full rounded-lg text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all">
+        <button 
+          onClick={handleSignOut}
+          className="flex items-center gap-3 px-4 py-3 w-full rounded-lg text-sm font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-all"
+        >
           <LogOut className="w-5 h-5" />
           Sign Out
         </button>

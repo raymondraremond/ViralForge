@@ -1,29 +1,134 @@
 "use server"
 
-import { db } from "@/lib/drizzle/db"
-import { profiles, contentItems, socialAccounts } from "@/lib/drizzle/schema"
-import { eq, desc } from "drizzle-orm"
+import { db, isDatabaseConfigured } from "@/lib/drizzle/db"
+import { profiles, contentItems, socialAccounts, trends, growthMetrics } from "@/lib/drizzle/schema"
+import { eq, desc, and } from "drizzle-orm"
 
 /**
  * ACTIONS: VIRALFORGE DATA PERSISTENCE
+ * All server actions with demo-mode fallbacks when DB is not configured.
  */
 
+// ==================== PROFILE ====================
+
 export async function getProfile(userId: string) {
-  const result = await db.select().from(profiles).where(eq(profiles.id, userId));
-  return result[0];
+  if (!isDatabaseConfigured()) return null;
+  try {
+    const result = await db.select().from(profiles).where(eq(profiles.id, userId));
+    return result[0] || null;
+  } catch { return null; }
 }
 
+export async function upsertProfile(userId: string, data: { fullName?: string; niche?: string; monetizationGoal?: string }) {
+  if (!isDatabaseConfigured()) return null;
+  try {
+    const existing = await db.select().from(profiles).where(eq(profiles.id, userId));
+    if (existing.length > 0) {
+      const result = await db.update(profiles)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(profiles.id, userId))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(profiles)
+        .values({ id: userId, ...data })
+        .returning();
+      return result[0];
+    }
+  } catch (e) { console.error("[ACTION] upsertProfile error:", e); return null; }
+}
+
+// ==================== CONTENT ITEMS ====================
+
 export async function getContentItems(userId: string) {
-  return await db.select()
-    .from(contentItems)
-    .where(eq(contentItems.userId, userId))
-    .orderBy(desc(contentItems.createdAt));
+  if (!isDatabaseConfigured()) return [];
+  try {
+    return await db.select()
+      .from(contentItems)
+      .where(eq(contentItems.userId, userId))
+      .orderBy(desc(contentItems.createdAt));
+  } catch { return []; }
 }
 
 export async function createContentItem(data: any) {
-  return await db.insert(contentItems).values(data).returning();
+  if (!isDatabaseConfigured()) return [];
+  try {
+    return await db.insert(contentItems).values(data).returning();
+  } catch (e) { console.error("[ACTION] createContentItem error:", e); return []; }
 }
 
+export async function updateContentStatus(itemId: string, status: string) {
+  if (!isDatabaseConfigured()) return null;
+  try {
+    const result = await db.update(contentItems)
+      .set({ status })
+      .where(eq(contentItems.id, itemId))
+      .returning();
+    return result[0];
+  } catch { return null; }
+}
+
+export async function deleteContentItem(itemId: string) {
+  if (!isDatabaseConfigured()) return false;
+  try {
+    await db.delete(contentItems).where(eq(contentItems.id, itemId));
+    return true;
+  } catch { return false; }
+}
+
+// ==================== SOCIAL ACCOUNTS ====================
+
 export async function getConnectedAccounts(userId: string) {
-  return await db.select().from(socialAccounts).where(eq(socialAccounts.userId, userId));
+  if (!isDatabaseConfigured()) return [];
+  try {
+    return await db.select().from(socialAccounts).where(eq(socialAccounts.userId, userId));
+  } catch { return []; }
+}
+
+// ==================== TRENDS ====================
+
+export async function getActiveTrends(limit: number = 10) {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    return await db.select()
+      .from(trends)
+      .where(eq(trends.isActive, true))
+      .orderBy(desc(trends.discoveredAt))
+      .limit(limit);
+  } catch { return []; }
+}
+
+export async function getAllTrends() {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    return await db.select()
+      .from(trends)
+      .orderBy(desc(trends.discoveredAt))
+      .limit(50);
+  } catch { return []; }
+}
+
+// ==================== GROWTH METRICS ====================
+
+export async function getLatestMetrics(userId: string) {
+  if (!isDatabaseConfigured()) return null;
+  try {
+    const result = await db.select()
+      .from(growthMetrics)
+      .where(eq(growthMetrics.userId, userId))
+      .orderBy(desc(growthMetrics.recordedAt))
+      .limit(1);
+    return result[0] || null;
+  } catch { return null; }
+}
+
+export async function getMetricsHistory(userId: string, limit: number = 30) {
+  if (!isDatabaseConfigured()) return [];
+  try {
+    return await db.select()
+      .from(growthMetrics)
+      .where(eq(growthMetrics.userId, userId))
+      .orderBy(desc(growthMetrics.recordedAt))
+      .limit(limit);
+  } catch { return []; }
 }

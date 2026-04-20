@@ -1,5 +1,7 @@
 import { Anthropic } from "@anthropic-ai/sdk";
 import { OpenAI } from "openai";
+import { db } from "@/lib/drizzle/db";
+import { trends as trendsTable } from "@/lib/drizzle/schema";
 
 /**
  * VIRALFORGE AI BRAIN
@@ -62,5 +64,17 @@ export class ViralBrain {
   async optimizeStyle(pastMetrics: any) {
     // Logic to adjust "style" if engagement is dropping
     // Returns "Keep Style" or "Pivot Style" with recommendations
+  }
+
+  /**
+   * Persistence: Save Discovered Trends
+   */
+  async saveTrend(data: any) {
+    return await db.insert(trendsTable).values({
+      platform: data.platform,
+      trendType: data.type,
+      trendData: data.details,
+      viralityScore: data.score,
+    }).returning();
   }
 }
