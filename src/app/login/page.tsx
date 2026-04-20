@@ -132,6 +132,7 @@ export default function LoginPage() {
             Github
           </button>
           <button 
+            onClick={() => handleOAuthLogin('google')}
             className="flex items-center justify-center gap-2 py-3 glass rounded-xl hover:bg-white/5 transition-all"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
