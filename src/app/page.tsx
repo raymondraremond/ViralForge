@@ -18,8 +18,8 @@ export default function Home() {
             Next-Gen AI Social Co-Pilot
           </div>
 
-          <h1 className="text-6xl md:text-7xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-b from-white to-white/50 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200">
-            Forge Your Viral <br /> <span className="text-primary">Destiny with AI</span>
+          <h1 className="text-6xl md:text-7xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-white/50 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-200 pb-2">
+            Forge Your Viral <br /> <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-400">Destiny with AI</span>
           </h1>
 
           <p className="max-w-2xl mx-auto text-xl text-muted-foreground animate-in fade-in slide-in-from-bottom-12 duration-1000 delay-300">
