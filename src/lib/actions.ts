@@ -19,7 +19,7 @@ export async function getProfile(userId: string) {
   } catch { return null; }
 }
 
-export async function upsertProfile(userId: string, data: { fullName?: string; niche?: string; monetizationGoal?: string }) {
+export async function upsertProfile(userId: string, data: { fullName?: string; niche?: string; monetizationGoal?: string; isAutonomous?: boolean }) {
   if (!isDatabaseConfigured()) return null;
   try {
     const existing = await db.select().from(profiles).where(eq(profiles.id, userId));

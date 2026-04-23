@@ -6,7 +6,15 @@ import { InstagramIcon, TwitterIcon, YoutubeIcon, LinkedinIcon, TikTokIcon } fro
 import { createClient } from "@/lib/supabase/client"
 import { upsertProfile, getProfile, getConnectedAccounts, upsertSocialAccount, disconnectSocialAccount } from "@/lib/actions"
 
-const platformsList = [
+type Platform = {
+  name: string;
+  id: string;
+  icon: any;
+  connected: boolean;
+  handle?: string;
+}
+
+const platformsList: Platform[] = [
   { name: "TikTok", id: "tiktok", icon: TikTokIcon, connected: false },
   { name: "Instagram", id: "instagram", icon: InstagramIcon, connected: false },
   { name: "YouTube", id: "youtube", icon: YoutubeIcon, connected: false },
@@ -15,7 +23,7 @@ const platformsList = [
 ]
 
 export default function SettingsPage() {
-  const [platforms, setPlatforms] = useState(platformsList)
+  const [platforms, setPlatforms] = useState<Platform[]>(platformsList)
   const [revenueGoal, setRevenueGoal] = useState("0")
   const [niche, setNiche] = useState("AI & Technology")
   const [antiFlagging, setAntiFlagging] = useState(true)

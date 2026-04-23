@@ -35,7 +35,7 @@ export class ViralBrain {
   async analyzeTrends(niche: string, platform: string) {
     console.log(`[BRAIN]: Starting real-world trend analysis for ${niche} on ${platform}...`);
     
-    let scrapedData = [];
+    let scrapedData: any[] = [];
     
     try {
       if (platform.toLowerCase() === "tiktok") {
