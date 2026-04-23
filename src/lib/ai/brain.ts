@@ -1,36 +1,46 @@
-import { Anthropic } from "@anthropic-ai/sdk";
-import { OpenAI } from "openai";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ApifyClient } from "apify-client";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { OpenAI } from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/drizzle/db";
 import { trends as trendsTable } from "@/lib/drizzle/schema";
 
 /**
- * VIRALFORGE AI BRAIN
- * Multi-agent system for autonomous content growth.
+ * VIRALBRAIN: The Autonomous Growth Engine
+ * -----------------------------------------
+ * This class orchestrates the intelligence layer. 
+ * It connects to Apify for scraping, and Google Gemini (primary) 
+ * with OpenAI/Anthropic as fallbacks for analysis.
  */
 
 export class ViralBrain {
-  private anthropic: Anthropic;
-  private openai: OpenAI;
-  private gemini: GoogleGenerativeAI;
   private apify: ApifyClient;
+  private gemini: any;
+  private openai: any;
+  private anthropic: any;
 
   constructor() {
-    if (!process.env.ANTHROPIC_API_KEY) console.warn("[BRAIN_WARNING]: ANTHROPIC_API_KEY is missing.");
-    if (!process.env.OPENAI_API_KEY) console.warn("[BRAIN_WARNING]: OPENAI_API_KEY is missing.");
-    if (!process.env.GOOGLE_AI_API_KEY) console.warn("[BRAIN_WARNING]: GOOGLE_AI_API_KEY is missing.");
-    if (!process.env.APIFY_API_TOKEN) console.warn("[BRAIN_WARNING]: APIFY_API_TOKEN is missing.");
+    this.apify = new ApifyClient({
+      token: process.env.APIFY_API_TOKEN || "missing",
+    });
 
-    this.anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "missing" });
-    this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || "missing" });
-    this.gemini = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY || "missing");
-    this.apify = new ApifyClient({ token: process.env.APIFY_API_TOKEN || "missing" });
+    if (process.env.GOOGLE_AI_API_KEY) {
+      const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY);
+      this.gemini = genAI;
+    }
+
+    if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== "missing") {
+      this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    }
+
+    if (process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== "missing") {
+      this.anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    }
   }
 
   /**
    * Agent 1: Trend Analyst
-   * Studies current high-performing hooks and formats in a specific niche.
+   * Scrapes real data and uses AI to extract viral patterns.
    */
   async analyzeTrends(niche: string, platform: string) {
     console.log(`[BRAIN]: Starting real-world trend analysis for ${niche} on ${platform}...`);
@@ -39,12 +49,12 @@ export class ViralBrain {
     
     try {
       if (platform.toLowerCase() === "tiktok") {
-        // Using TikTok Scraper to find trending videos for the niche
+        // Using TikTok Scraper (TikTok Hashtag Scraper)
         const run = await this.apify.actor("clockworks/tiktok-scraper").call({
           hashtags: [niche.replace(/\s+/g, '')],
           resultsPerPage: 5,
-          shouldDownloadVideo: false,
-          shouldDownloadCover: false,
+          shouldDownloadVideos: false,
+          shouldDownloadCovers: false,
         });
         const { items } = await this.apify.dataset(run.defaultDatasetId).listItems();
         scrapedData = items;
@@ -78,7 +88,6 @@ export class ViralBrain {
       }
     } catch (error) {
       console.error(`[BRAIN_ERROR]: Apify scraping failed:`, error);
-      // Fallback to simulation or simplified logic if needed
       return [];
     }
 
@@ -87,56 +96,61 @@ export class ViralBrain {
       return [];
     }
 
+    const trendPrompt = `
+      Analyze this raw social media data for the niche "${niche}" on ${platform}:
+      ${JSON.stringify(scrapedData.slice(0, 5))}
+      
+      Extract the top 3 viral trends/patterns. 
+      Return ONLY a JSON array of objects with these keys:
+      - trendType: "hashtag", "audio", "visual_hook", or "topic"
+      - viralityScore: 0-100
+      - trendData: { description: string, growth: string }
+    `;
+
     if (process.env.GOOGLE_AI_API_KEY) {
       console.log(`[BRAIN]: Using Gemini for trend analysis...`);
-      const model = this.gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const result = await model.generateContent(prompt);
-      const contentText = result.response.text();
       try {
+        const model = this.gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const result = await model.generateContent(trendPrompt);
+        const contentText = result.response.text();
         const jsonMatch = contentText.match(/\[[\s\S]*\]/);
         return jsonMatch ? JSON.parse(jsonMatch[0]) : [];
       } catch (e) {
-        console.error("[BRAIN]: Gemini JSON parse failed", e);
+        console.error("[BRAIN]: Gemini Trend analysis failed", e);
       }
     }
 
-    if (process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== "missing") {
+    if (this.anthropic) {
       console.log(`[BRAIN]: Falling back to Anthropic for trend analysis...`);
-      const response = await this.anthropic.messages.create({
-        model: "claude-3-5-sonnet-20240620",
-        max_tokens: 1500,
-        messages: [{ role: "user", content: prompt }],
-      });
-
-      const contentText = response.content
-        .filter(block => block.type === 'text')
-        .map(block => (block as any).text)
-        .join('\n');
-
       try {
+        const response = await this.anthropic.messages.create({
+          model: "claude-3-5-sonnet-20240620",
+          max_tokens: 1500,
+          messages: [{ role: "user", content: trendPrompt }],
+        });
+
+        const contentText = response.content
+          .filter((block: any) => block.type === 'text')
+          .map((block: any) => block.text)
+          .join('\n');
+
         const jsonMatch = contentText.match(/\[[\s\S]*\]/);
         return jsonMatch ? JSON.parse(jsonMatch[0]) : [];
       } catch (e) {
-        console.error("[BRAIN]: Anthropic JSON parse failed", e);
+        console.error("[BRAIN]: Anthropic Trend analysis failed", e);
       }
     }
 
-    // Default fallback
-    return scrapedData.map((item: any) => ({
-      type: "pattern",
-      description: item.text || item.caption || "Viral Pattern",
-      viralityScore: 85,
-      hashtag: niche
-    }));
+    return [];
   }
 
   /**
    * Agent 2: Creative Strategist
-   * Generates a script and visual cues based on trend analysis.
+   * Converts trends into a content script and strategy.
    */
-  async generateContentStrategy(trendData: any, niche: string) {
-    const prompt = `Based on these trends: ${JSON.stringify(trendData)}, 
-    create a viral 30-second script for a ${niche} video. 
+  async generateContentStrategy(trends: any[], niche: string, platform: string = "tiktok") {
+    const strategyPrompt = `Using these trends: ${JSON.stringify(trends)}, 
+    create a viral 30-second script for a ${niche} video on ${platform}. 
     Include:
     1. A pattern-interrupt hook.
     2. Visual prompts for AI Video generation.
@@ -146,54 +160,57 @@ export class ViralBrain {
 
     if (process.env.GOOGLE_AI_API_KEY) {
       console.log(`[BRAIN]: Using Gemini for content strategy...`);
-      const model = this.gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
       try {
+        const model = this.gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const result = await model.generateContent(strategyPrompt);
+        const text = result.response.text();
         const jsonMatch = text.match(/\{[\s\S]*\}/);
         return jsonMatch ? JSON.parse(jsonMatch[0]) : {};
       } catch (e) {
-        console.error("[BRAIN]: Gemini Strategy JSON parse failed", e);
+        console.error("[BRAIN]: Gemini Strategy failed", e);
       }
     }
 
-    if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== "missing") {
+    if (this.openai) {
       console.log(`[BRAIN]: Falling back to OpenAI for content strategy...`);
-      const response = await this.openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" }
-      });
-      return response.choices[0].message.content;
+      try {
+        const response = await this.openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [{ role: "user", content: strategyPrompt }],
+          response_format: { type: "json_object" }
+        });
+        return JSON.parse(response.choices[0].message.content);
+      } catch (e) {
+        console.error("[BRAIN]: OpenAI Strategy failed", e);
+      }
     }
 
     return {
       title: "Fallback Viral Post",
       hook: "Stop scrolling for a second...",
       visual_prompt: "Cinematic shot of neon city",
-      voiceover: "This is a fallback script because no AI keys were found.",
+      voiceover: "This is a fallback script because AI generation failed.",
       style: "Cinematic"
     };
   }
 
   /**
    * Agent 3: Performance Optimizer
-   * Decides if content needs variation based on past metrics.
    */
   async optimizeStyle(pastMetrics: any) {
-    // Logic to adjust "style" if engagement is dropping
-    // Returns "Keep Style" or "Pivot Style" with recommendations
+    return "Keep Style";
   }
 
   /**
    * Persistence: Save Discovered Trends
    */
   async saveTrend(data: any) {
+    if (!db) return null;
     return await db.insert(trendsTable).values({
       platform: data.platform,
-      trendType: data.type,
-      trendData: data.details,
-      viralityScore: data.score,
+      trendType: data.trendType || data.type,
+      trendData: data.trendData || data.details,
+      viralityScore: data.viralityScore || data.score,
     }).returning();
   }
 }
