@@ -36,12 +36,29 @@ export default function LoginPage() {
   }
 
   const handleOAuthLogin = async (provider: 'github' | 'google') => {
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/api/auth/callback`,
-      },
-    })
+    try {
+      // Check if keys are actually present before trying
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (!url || !key) {
+        setError("Supabase configuration is missing. Please check your environment variables.");
+        return;
+      }
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: `${window.location.origin}/api/auth/callback`,
+        },
+      })
+
+      if (error) {
+        setError(error.message);
+      }
+    } catch (err: any) {
+      setError(err.message || "An unexpected error occurred during login.");
+    }
   }
 
   return (

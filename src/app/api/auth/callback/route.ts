@@ -23,14 +23,8 @@ export async function GET(request: Request) {
   })
 
   if (!supabaseUrl || !supabaseKey) {
-    return new NextResponse(
-      JSON.stringify({ 
-        error: "Server Configuration Error", 
-        message: "Supabase environment variables are missing on Vercel. Please check your Project Settings.",
-        hint: "Ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set."
-      }), 
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    )
+    console.error('[AUTH_CALLBACK] Critical: Supabase credentials missing on server!')
+    return NextResponse.redirect(`${origin}/login?error=missing_config`)
   }
 
   if (code) {
