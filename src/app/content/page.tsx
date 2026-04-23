@@ -1,7 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Play, MoreVertical, CheckCircle2, Clock, AlertCircle, Plus, Trash2, X, Loader2, Send } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { getContentItems, updateContentStatus, deleteContentItem } from "@/lib/actions"
 
 type ContentItem = {
   id: string
@@ -13,20 +15,55 @@ type ContentItem = {
   hook?: string
 }
 
-const demoContent: ContentItem[] = [
-  { id: "1", title: "AI Productivity Hacks POV", status: "scheduled", platform: "TikTok", thumbnail: "https://images.unsplash.com/photo-1675271591211-126ad94e495d?auto=format&fit=crop&q=80&w=400", time: "Today, 6:00 PM", hook: "POV: Your AI just saved you 4 hours" },
-  { id: "2", title: "The Future of Coding 2026", status: "posted", platform: "Instagram", thumbnail: "https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&q=80&w=400", time: "2 hours ago", hook: "Stop scrolling if you want to code faster" },
-  { id: "3", title: "Why faceless channels win", status: "brain_review", platform: "YouTube", thumbnail: "https://images.unsplash.com/photo-1611162617474-5b21e879e113?auto=format&fit=crop&q=80&w=400", time: "Awaiting Approval", hook: "Nobody shows their face anymore. Here's why." },
-  { id: "4", title: "5 SaaS Ideas That Print Money", status: "draft", platform: "TikTok", thumbnail: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=400", time: "Draft", hook: "Each one makes $10K/mo minimum" },
-]
-
 const tabs = ["All Content", "Scheduled", "Awaiting Approval", "Posted", "Drafts"]
 
 export default function ContentPage() {
-  const [items, setItems] = useState<ContentItem[]>(demoContent)
+  const [items, setItems] = useState<ContentItem[]>([])
+  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("All Content")
   const [showGenModal, setShowGenModal] = useState(false)
   const [genLoading, setGenLoading] = useState(false)
+  const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+
+  const supabase = createClient()
+
+  const fetchContent = async (userId: string) => {
+    try {
+      const data = await getContentItems(userId)
+      const mapped: ContentItem[] = data.map((i: any) => ({
+        id: i.id,
+        title: i.title,
+        status: i.status as any,
+        platform: "TikTok", // Default if not in DB
+        thumbnail: i.mediaUrl || "https://images.unsplash.com/photo-1675271591211-126ad94e495d?auto=format&fit=crop&q=80&w=400",
+        time: i.scheduledAt ? new Date(i.scheduledAt).toLocaleString() : (i.postedAt ? "Posted" : "Draft"),
+        hook: i.hook
+      }))
+      setItems(mapped)
+    } catch (error) {
+      console.error("Failed to fetch content", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        setUser(session.user)
+        fetchContent(session.user.id)
+        
+        // Get profile for niche
+        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
+        setProfile(profileData)
+      } else {
+        setLoading(false)
+      }
+    }
+    getUser()
+  }, [])
 
   const filtered = items.filter(item => {
     if (activeTab === "All Content") return true
@@ -37,29 +74,42 @@ export default function ContentPage() {
     return true
   })
 
-  const handleApprove = (id: string) => {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, status: "scheduled" as const, time: "Scheduled for next slot" } : i))
+  const handleApprove = async (id: string) => {
+    const res = await updateContentStatus(id, "scheduled")
+    if (res) {
+      setItems(prev => prev.map(i => i.id === id ? { ...i, status: "scheduled" as const, time: "Scheduled" } : i))
+    }
   }
 
-  const handleDelete = (id: string) => {
-    setItems(prev => prev.filter(i => i.id !== id))
+  const handleDelete = async (id: string) => {
+    const success = await deleteContentItem(id)
+    if (success) {
+      setItems(prev => prev.filter(i => i.id !== id))
+    }
   }
 
   const handleGenerate = async () => {
+    if (!user) return
     setGenLoading(true)
-    await new Promise(r => setTimeout(r, 2000))
-    const newItem: ContentItem = {
-      id: Date.now().toString(),
-      title: "AI-Generated: Viral Hook Pattern",
-      status: "brain_review",
-      platform: "TikTok",
-      thumbnail: "https://images.unsplash.com/photo-1677442136019-21780ecad995?auto=format&fit=crop&q=80&w=400",
-      time: "Just now",
-      hook: "This one trick 10x'd my growth overnight"
+    try {
+      const res = await fetch("/api/ai/generate", {
+        method: "POST",
+        body: JSON.stringify({
+          userId: user.id,
+          niche: profile?.niche || "AI & Tech",
+          platform: "TikTok"
+        })
+      })
+      const data = await res.json()
+      if (data.success) {
+        await fetchContent(user.id)
+      }
+    } catch (error) {
+      console.error("Generation failed", error)
+    } finally {
+      setGenLoading(false)
+      setShowGenModal(false)
     }
-    setItems(prev => [newItem, ...prev])
-    setGenLoading(false)
-    setShowGenModal(false)
   }
 
   return (

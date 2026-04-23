@@ -10,7 +10,7 @@ import { createContentItem } from "@/lib/actions";
 
 export async function POST(req: Request) {
   try {
-    const { userId, niche, platform } = await req.json();
+    const { userId, niche, platform, isAutonomous } = await req.json();
 
     const brain = new ViralBrain();
     const media = new MediaService();
@@ -36,9 +36,10 @@ export async function POST(req: Request) {
       scriptContent: strategy.voiceover,
       mediaUrl: assets.finalMediaUrl,
       mediaType: "video",
-      status: "brain_review", // Set to 'scheduled' for full autonomous
+      status: isAutonomous ? "scheduled" : "brain_review",
+      scheduledAt: isAutonomous ? new Date(Date.now() + 24 * 60 * 60 * 1000) : null,
       aiMetadata: {
-        model: "claude-3-5-sonnet",
+        engine: "Gemini 1.5 Flash",
         trend_context: trends
       }
     });

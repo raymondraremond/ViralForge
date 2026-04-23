@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from "react"
 import { BrainCircuit, Cpu, Sparkles, Terminal, Play, Loader2, Send } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { getProfile, upsertProfile } from "@/lib/actions"
 
 type LogEntry = { text: string; type: "system" | "info" | "strategy" | "warning" | "error" | "success" }
 
@@ -12,6 +14,7 @@ const initialLogs: LogEntry[] = [
 ]
 
 export default function BrainPage() {
+  const supabase = createClient()
   const [logs, setLogs] = useState<LogEntry[]>(initialLogs)
   const [scanning, setScanning] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -40,46 +43,26 @@ export default function BrainPage() {
   const handleScan = async () => {
     setScanning(true)
     setAgentProgress({ analyst: 0, strategist: 0, producer: 0 })
-    addLog({ text: `[SYSTEM]: Trend scan initiated for "${niche}" on ${platform}...`, type: "system" })
+    addLog({ text: `[SYSTEM]: Real-time trend scan initiated for "${niche}" on ${platform}...`, type: "system" })
 
     const i1 = simulateProgress("analyst", 100)
-
-    await new Promise(r => setTimeout(r, 800))
-    addLog({ text: `[SCAN]: Connecting to ${platform} trend API...`, type: "info" })
 
     try {
       const res = await fetch("/api/ai/scan")
       const data = await res.json()
       if (data.success) {
-        addLog({ text: `[SUCCESS]: Scanned ${data.scanned?.length || 0} niche/platform combos.`, type: "success" })
-        addLog({ text: `[STRATEGY]: Detected high-virality patterns. Updating trend database.`, type: "strategy" })
+        addLog({ text: `[SUCCESS]: Scanned ${data.scanned?.length || 0} niche/platform combinations.`, type: "success" })
+        addLog({ text: `[STRATEGY]: Detected viral patterns. Updating trend database.`, type: "strategy" })
       } else {
-        addLog({ text: `[INFO]: AI keys not configured — showing demo analysis.`, type: "warning" })
-        await runDemoScan()
+        addLog({ text: `[ERROR]: Scan failed. Verify Apify and AI keys.`, type: "error" })
       }
-    } catch {
-      addLog({ text: `[INFO]: Running in demo mode (configure AI keys for live scans).`, type: "warning" })
-      await runDemoScan()
+    } catch (error) {
+      addLog({ text: `[ERROR]: Connection error during scan.`, type: "error" })
     }
 
     clearInterval(i1)
     setAgentProgress(prev => ({ ...prev, analyst: 100 }))
     setScanning(false)
-  }
-
-  const runDemoScan = async () => {
-    const demoSteps = [
-      { text: `[SCAN]: Analyzing ${platform} feed for "${niche}"...`, type: "info" as const, delay: 600 },
-      { text: `[DETECT]: Split-screen + POV hooks performing 3.2x above baseline.`, type: "info" as const, delay: 800 },
-      { text: `[DETECT]: Lo-fi background audio increasing avg. watch time by 18%.`, type: "info" as const, delay: 600 },
-      { text: `[WARNING]: High competition on #AI — pivoting to long-tail keywords.`, type: "warning" as const, delay: 700 },
-      { text: `[STRATEGY]: Recommended hooks: "POV: You discover...", "Stop scrolling if..."`, type: "strategy" as const, delay: 500 },
-      { text: `[SUCCESS]: 3 high-virality patterns stored to trend database.`, type: "success" as const, delay: 400 },
-    ]
-    for (const step of demoSteps) {
-      await new Promise(r => setTimeout(r, step.delay))
-      addLog(step)
-    }
   }
 
   const handleGenerate = async () => {
@@ -88,23 +71,43 @@ export default function BrainPage() {
     addLog({ text: `[SYSTEM]: Content generation pipeline started...`, type: "system" })
 
     const i2 = simulateProgress("strategist", 100)
-    await new Promise(r => setTimeout(r, 1200))
-    addLog({ text: `[STRATEGY]: Drafting viral script based on detected trends...`, type: "strategy" })
+    
+    try {
+      // Get user session for generation
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        addLog({ text: `[ERROR]: User session not found. Please log in again.`, type: "error" })
+        setGenerating(false)
+        return
+      }
 
-    await new Promise(r => setTimeout(r, 800))
-    addLog({ text: `[SCRIPT]: Hook — "POV: Your AI just made you $10K while you slept"`, type: "info" })
-    clearInterval(i2)
-    setAgentProgress(prev => ({ ...prev, strategist: 100 }))
+      const res = await fetch("/api/ai/generate", {
+        method: "POST",
+        body: JSON.stringify({
+          userId: session.user.id,
+          niche,
+          platform
+        })
+      })
+      const data = await res.json()
 
-    const i3 = simulateProgress("producer", 100)
-    await new Promise(r => setTimeout(r, 600))
-    addLog({ text: `[PRODUCE]: Sending visual prompt to media pipeline...`, type: "info" })
-    await new Promise(r => setTimeout(r, 800))
-    addLog({ text: `[PRODUCE]: Video + voiceover assets generated.`, type: "info" })
-    await new Promise(r => setTimeout(r, 400))
-    addLog({ text: `[SUCCESS]: Content saved — Status: Awaiting Approval.`, type: "success" })
-    clearInterval(i3)
-    setAgentProgress(prev => ({ ...prev, producer: 100 }))
+      if (data.success) {
+        addLog({ text: `[STRATEGY]: Script generated: "${data.item[0]?.title}"`, type: "strategy" })
+        clearInterval(i2)
+        setAgentProgress(prev => ({ ...prev, strategist: 100 }))
+
+        const i3 = simulateProgress("producer", 100)
+        addLog({ text: `[PRODUCE]: Media assets generated and stored.`, type: "info" })
+        addLog({ text: `[SUCCESS]: Content saved — Status: Awaiting Approval.`, type: "success" })
+        clearInterval(i3)
+        setAgentProgress(prev => ({ ...prev, producer: 100 }))
+      } else {
+        addLog({ text: `[ERROR]: Generation failed: ${data.error}`, type: "error" })
+      }
+    } catch (error) {
+      addLog({ text: `[ERROR]: Pipeline failure. Check API logs.`, type: "error" })
+    }
+
     setGenerating(false)
   }
 
@@ -116,6 +119,27 @@ export default function BrainPage() {
       case "error": return "text-red-400"
       case "success": return "text-green-400"
       default: return "text-muted-foreground"
+    }
+  }
+
+  useEffect(() => {
+    const loadAutoMode = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        const profile = await getProfile(session.user.id)
+        if (profile) setAutoMode(profile.isAutonomous || false)
+      }
+    }
+    loadAutoMode()
+  }, [])
+
+  const toggleAutoMode = async () => {
+    const newMode = !autoMode
+    setAutoMode(newMode)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user) {
+      await upsertProfile(session.user.id, { isAutonomous: newMode } as any)
+      addLog({ text: `[SYSTEM]: Autonomous mode ${newMode ? 'ENABLED' : 'DISABLED'}.`, type: "system" })
     }
   }
 
@@ -146,6 +170,7 @@ export default function BrainPage() {
             <option value="tiktok">TikTok</option>
             <option value="instagram">Instagram</option>
             <option value="youtube">YouTube</option>
+            <option value="twitter">X (Twitter)</option>
           </select>
         </div>
         <button onClick={handleScan} disabled={scanning || generating} className="px-5 py-2 glass-card rounded-xl text-sm font-medium hover:bg-white/10 transition-all flex items-center gap-2 disabled:opacity-50">
@@ -193,7 +218,7 @@ export default function BrainPage() {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm font-medium">Currently: <span className={autoMode ? "text-primary" : "text-muted-foreground"}>{autoMode ? "ACTIVE" : "MANUAL"}</span></span>
-            <button onClick={() => setAutoMode(!autoMode)} className="px-6 py-2 bg-primary rounded-full text-sm font-bold shadow-lg shadow-primary/30 hover:scale-105 transition-all">
+            <button onClick={toggleAutoMode} className="px-6 py-2 bg-primary rounded-full text-sm font-bold shadow-lg shadow-primary/30 hover:scale-105 transition-all">
               Switch to {autoMode ? "Manual Approval" : "Autonomous"}
             </button>
           </div>

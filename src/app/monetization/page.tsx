@@ -1,10 +1,12 @@
 "use client"
 
-import { useState } from "react"
-import { Zap, DollarSign, Target, TrendingUp, ArrowUpRight, Wallet, BarChart3 } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Zap, DollarSign, Target, TrendingUp, ArrowUpRight, Wallet, BarChart3, Loader2 } from "lucide-react"
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts"
+import { createClient } from "@/lib/supabase/client"
+import { getProfile } from "@/lib/actions"
 
-const revenueData = [
+const defaultRevenueData = [
   { month: "Jan", revenue: 2400, goal: 5000 },
   { month: "Feb", revenue: 3800, goal: 5000 },
   { month: "Mar", revenue: 5200, goal: 6000 },
@@ -21,6 +23,33 @@ const platformRevenue = [
 ]
 
 export default function MonetizationPage() {
+  const [loading, setLoading] = useState(true)
+  const [revenueData, setRevenueData] = useState(defaultRevenueData)
+  const [profile, setProfile] = useState<any>(null)
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        const data = await getProfile(session.user.id)
+        if (data) {
+          setProfile(data)
+          // Adjust goal line based on user's set goal
+          const goal = parseFloat(data.monetizationGoal?.toString() || "5000")
+          setRevenueData(prev => prev.map(d => ({ ...d, goal })))
+        }
+      }
+      setLoading(false)
+    }
+    loadProfile()
+  }, [])
+
+  if (loading) {
+    return <div className="flex h-[60vh] items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+  }
+
   return (
     <div className="p-8 space-y-8 animate-in fade-in duration-700">
       <div className="flex flex-col gap-2">

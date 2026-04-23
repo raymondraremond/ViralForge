@@ -1,41 +1,82 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { TrendingUp, Users, Eye, ArrowUpRight, Zap, RefreshCw, BrainCircuit, Loader2 } from "lucide-react"
 import { formatNumber } from "@/lib/utils"
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
-
-const demoChartData = [
-  { date: "Mon", views: 1200, followers: 45 },
-  { date: "Tue", views: 2100, followers: 62 },
-  { date: "Wed", views: 1800, followers: 53 },
-  { date: "Thu", views: 3400, followers: 87 },
-  { date: "Fri", views: 4200, followers: 110 },
-  { date: "Sat", views: 5800, followers: 156 },
-  { date: "Sun", views: 7200, followers: 203 },
-]
-
-const demoStats = [
-  { name: "Total Followers", value: 24800, change: "+12.5%", icon: Users, color: "text-blue-400" },
-  { name: "Total Views", value: 1420000, change: "+34.2%", icon: Eye, color: "text-purple-400" },
-  { name: "Engagement Rate", value: "4.8%", change: "+0.8%", icon: TrendingUp, color: "text-green-400" },
-  { name: "Revenue Generated", value: "$12,450", change: "+18.4%", icon: Zap, color: "text-yellow-400" },
-]
-
-const demoTrends = [
-  { id: "1", platform: "TikTok", trendType: "Hook", trendData: { hashtag: "AIHacks" }, viralityScore: 96 },
-  { id: "2", platform: "Instagram", trendType: "Style", trendData: { hashtag: "FacelessContent" }, viralityScore: 91 },
-  { id: "3", platform: "YouTube", trendType: "Format", trendData: { hashtag: "POVReactions" }, viralityScore: 87 },
-  { id: "4", platform: "TikTok", trendType: "Audio", trendData: { hashtag: "LoFiBeats" }, viralityScore: 84 },
-]
+import { createClient } from "@/lib/supabase/client"
 
 export default function Dashboard() {
+  const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [aiRunning, setAiRunning] = useState(false)
+  const [stats, setStats] = useState<any[]>([])
+  const [chartData, setChartData] = useState<any[]>([])
+  const [trends, setTrends] = useState<any[]>([])
+  const [user, setUser] = useState<any>(null)
+
+  const supabase = createClient()
+
+  const fetchData = async (userId: string) => {
+    try {
+      // Fetch metrics
+      const metricsRes = await fetch(`/api/metrics?userId=${userId}`)
+      const metricsData = await metricsRes.json()
+      
+      if (Array.isArray(metricsData) && metricsData.length > 0) {
+        const latest = metricsData[0]
+        setStats([
+          { name: "Total Followers", value: latest.followerCount, change: "+0%", icon: Users, color: "text-blue-400" },
+          { name: "Total Views", value: latest.viewsCount, change: "+0%", icon: Eye, color: "text-purple-400" },
+          { name: "Engagement Rate", value: `${(latest.engagementRate * 100).toFixed(1)}%`, change: "+0%", icon: TrendingUp, color: "text-green-400" },
+          { name: "Revenue Generated", value: "$0", change: "+0%", icon: Zap, color: "text-yellow-400" },
+        ])
+        
+        setChartData(metricsData.reverse().map(m => ({
+          date: new Date(m.recordedAt).toLocaleDateString(undefined, { weekday: 'short' }),
+          views: m.viewsCount,
+          followers: m.followerCount
+        })))
+      } else {
+        // Fallback to demo or empty
+        setStats([
+          { name: "Total Followers", value: 0, change: "+0%", icon: Users, color: "text-blue-400" },
+          { name: "Total Views", value: 0, change: "+0%", icon: Eye, color: "text-purple-400" },
+          { name: "Engagement Rate", value: "0%", change: "+0%", icon: TrendingUp, color: "text-green-400" },
+          { name: "Revenue Generated", value: "$0", change: "+0%", icon: Zap, color: "text-yellow-400" },
+        ])
+      }
+
+      // Fetch trends
+      const trendsRes = await fetch("/api/trends")
+      const trendsData = await trendsRes.json()
+      if (Array.isArray(trendsData)) {
+        setTrends(trendsData.slice(0, 4))
+      }
+    } catch (error) {
+      console.error("Dashboard data fetch failed", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        setUser(session.user)
+        fetchData(session.user.id)
+      } else {
+        setLoading(false)
+      }
+    }
+    getUser()
+  }, [])
 
   const handleRefresh = async () => {
+    if (!user) return
     setRefreshing(true)
-    await new Promise(r => setTimeout(r, 1000))
+    await fetchData(user.id)
     setRefreshing(false)
   }
 
@@ -43,8 +84,18 @@ export default function Dashboard() {
     setAiRunning(true)
     try {
       await fetch("/api/ai/scan")
+      if (user) await fetchData(user.id)
     } catch { /* keys not set yet */ }
     setAiRunning(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="p-8 flex flex-col items-center justify-center h-[80vh] gap-4">
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+        <p className="text-muted-foreground animate-pulse">Syncing with the matrix...</p>
+      </div>
+    )
   }
 
   return (
@@ -67,7 +118,7 @@ export default function Dashboard() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {demoStats.map((stat) => (
+        {stats.map((stat) => (
           <div key={stat.name} className="glass-card p-6 rounded-2xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
               <stat.icon className="w-12 h-12" />
@@ -85,7 +136,7 @@ export default function Dashboard() {
         <div className="lg:col-span-2 glass-card p-6 rounded-2xl">
           <h3 className="text-lg font-semibold mb-6">Views Over Time</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={demoChartData}>
+            <AreaChart data={chartData}>
               <defs>
                 <linearGradient id="vg" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(263,70%,50%)" stopOpacity={0.4} />
@@ -109,20 +160,25 @@ export default function Dashboard() {
             </div>
           </div>
           <div className="space-y-3">
-            {demoTrends.map((t) => (
+            {trends.map((t) => (
               <div key={t.id} className="flex items-center justify-between p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors cursor-pointer group">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg growth-gradient flex items-center justify-center">
                     <TrendingUp className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium group-hover:text-primary transition-colors">#{(t.trendData as any).hashtag}</p>
+                    <p className="text-sm font-medium group-hover:text-primary transition-colors line-clamp-1">{t.trendData.hashtag || t.trendData.description || t.trendType}</p>
                     <p className="text-xs text-muted-foreground">{t.platform}</p>
                   </div>
                 </div>
                 <p className="text-xs font-semibold text-primary">{t.viralityScore}/100</p>
               </div>
             ))}
+            {trends.length === 0 && (
+              <div className="text-center py-10 text-muted-foreground text-sm italic">
+                No trends detected yet.
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -85,6 +85,28 @@ export async function getConnectedAccounts(userId: string) {
   } catch { return []; }
 }
 
+export async function upsertSocialAccount(data: any) {
+  if (!isDatabaseConfigured()) return null;
+  try {
+    const existing = await db.select().from(socialAccounts).where(and(eq(socialAccounts.userId, data.userId), eq(socialAccounts.platform, data.platform)));
+    if (existing.length > 0) {
+      const result = await db.update(socialAccounts).set(data).where(eq(socialAccounts.id, existing[0].id)).returning();
+      return result[0];
+    } else {
+      const result = await db.insert(socialAccounts).values(data).returning();
+      return result[0];
+    }
+  } catch (e) { console.error("[ACTION] upsertSocialAccount error:", e); return null; }
+}
+
+export async function disconnectSocialAccount(userId: string, platform: string) {
+  if (!isDatabaseConfigured()) return false;
+  try {
+    await db.delete(socialAccounts).where(and(eq(socialAccounts.userId, userId), eq(socialAccounts.platform, platform)));
+    return true;
+  } catch { return false; }
+}
+
 // ==================== TRENDS ====================
 
 export async function getActiveTrends(limit: number = 10) {

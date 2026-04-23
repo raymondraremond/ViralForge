@@ -1,45 +1,105 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Plus, CheckCircle2, Lock, Target, DollarSign, Save, Loader2, Shield } from "lucide-react"
 import { InstagramIcon, TwitterIcon, YoutubeIcon, LinkedinIcon, TikTokIcon } from "@/components/icons"
+import { createClient } from "@/lib/supabase/client"
+import { upsertProfile, getProfile, getConnectedAccounts, upsertSocialAccount, disconnectSocialAccount } from "@/lib/actions"
 
 const platformsList = [
-  { name: "TikTok", icon: TikTokIcon, connected: true, handle: "@viralforge_ai" },
-  { name: "Instagram", icon: InstagramIcon, connected: true, handle: "@viralforge.prod" },
-  { name: "YouTube", icon: YoutubeIcon, connected: false },
-  { name: "X (Twitter)", icon: TwitterIcon, connected: false },
-  { name: "LinkedIn", icon: LinkedinIcon, connected: false },
+  { name: "TikTok", id: "tiktok", icon: TikTokIcon, connected: false },
+  { name: "Instagram", id: "instagram", icon: InstagramIcon, connected: false },
+  { name: "YouTube", id: "youtube", icon: YoutubeIcon, connected: false },
+  { name: "X (Twitter)", id: "twitter", icon: TwitterIcon, connected: false },
+  { name: "LinkedIn", id: "linkedin", icon: LinkedinIcon, connected: false },
 ]
 
 export default function SettingsPage() {
   const [platforms, setPlatforms] = useState(platformsList)
-  const [revenueGoal, setRevenueGoal] = useState("10,000")
+  const [revenueGoal, setRevenueGoal] = useState("0")
   const [niche, setNiche] = useState("AI & Technology")
   const [antiFlagging, setAntiFlagging] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  const supabase = createClient()
+
+  useEffect(() => {
+    const loadData = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        setUser(session.user)
+        
+        // Load profile
+        const profile = await getProfile(session.user.id)
+        if (profile) {
+          setNiche(profile.niche || "AI & Technology")
+          setRevenueGoal(profile.monetizationGoal?.toString() || "0")
+        }
+
+        // Load connected accounts
+        const accounts = await getConnectedAccounts(session.user.id)
+        setPlatforms(prev => prev.map(p => {
+          const account = accounts.find((a: any) => a.platform === p.id)
+          return account ? { ...p, connected: true, handle: account.handle } : p
+        }))
+      }
+      setLoading(false)
+    }
+    loadData()
+  }, [])
 
   const handleSave = async () => {
+    if (!user) return
     setSaving(true)
-    // In production, this calls upsertProfile server action
-    await new Promise(r => setTimeout(r, 1000))
+    await upsertProfile(user.id, {
+      niche,
+      monetizationGoal: revenueGoal
+    })
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
   }
 
-  const handleConnect = (name: string) => {
-    // In production, this initiates OAuth flow
-    setPlatforms(prev => prev.map(p =>
-      p.name === name ? { ...p, connected: true, handle: `@viralforge_${name.toLowerCase()}` } : p
-    ))
+  const handleConnect = async (pId: string) => {
+    if (!user) return
+    // In production, this initiates OAuth. For now, we simulate success.
+    const handle = `@${user.email?.split('@')[0]}_${pId}`
+    const success = await upsertSocialAccount({
+      userId: user.id,
+      platform: pId,
+      platformUserId: `sim_${Date.now()}`,
+      handle,
+      accessToken: "sim_token",
+      isActive: true
+    })
+
+    if (success) {
+      setPlatforms(prev => prev.map(p =>
+        p.id === pId ? { ...p, connected: true, handle } : p
+      ))
+    }
   }
 
-  const handleDisconnect = (name: string) => {
-    setPlatforms(prev => prev.map(p =>
-      p.name === name ? { ...p, connected: false, handle: undefined } : p
-    ))
+  const handleDisconnect = async (pId: string) => {
+    if (!user) return
+    const success = await disconnectSocialAccount(user.id, pId)
+    if (success) {
+      setPlatforms(prev => prev.map(p =>
+        p.id === pId ? { ...p, connected: false, handle: undefined } : p
+      ))
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="p-8 flex flex-col items-center justify-center h-[80vh] gap-4">
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+        <p className="text-muted-foreground animate-pulse">Loading system settings...</p>
+      </div>
+    )
   }
 
   return (
@@ -57,7 +117,7 @@ export default function SettingsPage() {
           </h3>
           <div className="space-y-3">
             {platforms.map((platform) => (
-              <div key={platform.name} className="glass-card p-4 rounded-xl flex items-center justify-between">
+              <div key={platform.id} className="glass-card p-4 rounded-xl flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className="p-2 bg-white/5 rounded-lg"><platform.icon className="w-5 h-5" /></div>
                   <div>
@@ -70,12 +130,12 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-1.5 text-green-400 text-xs font-medium">
                       <CheckCircle2 className="w-4 h-4" />Active
                     </div>
-                    <button onClick={() => handleDisconnect(platform.name)} className="text-xs text-muted-foreground hover:text-destructive transition-colors">
+                    <button onClick={() => handleDisconnect(platform.id)} className="text-xs text-muted-foreground hover:text-destructive transition-colors">
                       Disconnect
                     </button>
                   </div>
                 ) : (
-                  <button onClick={() => handleConnect(platform.name)} className="px-3 py-1.5 bg-primary/20 text-primary rounded-lg text-xs font-bold hover:bg-primary/30 transition-all">
+                  <button onClick={() => handleConnect(platform.id)} className="px-3 py-1.5 bg-primary/20 text-primary rounded-lg text-xs font-bold hover:bg-primary/30 transition-all">
                     Connect
                   </button>
                 )}

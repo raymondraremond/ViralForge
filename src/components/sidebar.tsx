@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -34,6 +35,19 @@ export function Sidebar() {
     router.refresh()
   }
 
+  const [accounts, setAccounts] = useState<any[]>([])
+
+  useEffect(() => {
+    const fetchAccounts = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        const { data } = await supabase.from('social_accounts').select('platform').eq('user_id', session.user.id)
+        if (data) setAccounts(data)
+      }
+    }
+    fetchAccounts()
+  }, [])
+
   return (
     <div className="flex flex-col h-screen w-64 glass border-r border-white/5 sticky top-0">
       <div className="p-6">
@@ -64,6 +78,22 @@ export function Sidebar() {
           )
         })}
       </nav>
+
+      {accounts.length > 0 && (
+        <div className="px-6 py-4">
+          <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">Active Handles</p>
+          <div className="flex gap-2">
+            {accounts.map(a => (
+              <div key={a.platform} className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center group relative cursor-help">
+                <span className="text-[10px] font-bold text-primary">{a.platform[0].toUpperCase()}</span>
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-black text-[10px] rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none border border-white/10">
+                  {a.platform.charAt(0).toUpperCase() + a.platform.slice(1)} Connected
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="p-4 border-t border-white/5">
         <button 
