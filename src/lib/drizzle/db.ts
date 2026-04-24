@@ -20,7 +20,10 @@ function getDb() {
     );
   }
 
-  const client = postgres(url, { ssl: 'require' });
+  const client = postgres(url, { 
+    ssl: { rejectUnauthorized: false },
+    prepare: false // Disable prepared statements for better pooler compatibility if needed
+  });
   _db = drizzle(client, { schema });
   return _db;
 }
