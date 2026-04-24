@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 /**
  * SUPABASE AUTH CALLBACK
  * Handles the OAuth redirect after login/signup (email confirmation, OAuth providers).
+ * Redeploy trigger: 2026-04-24
  */
 
 export async function GET(request: Request) {
