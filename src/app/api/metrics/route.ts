@@ -16,6 +16,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Missing userId" }, { status: 400 });
     }
 
+    // Basic UUID validation to prevent DB errors on dummy strings like "test"
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(userId)) {
+      console.log(`[METRICS_API] Invalid UUID format: ${userId}. Returning empty data.`);
+      return NextResponse.json([]);
+    }
+
     const latestMetrics = await db
       .select()
       .from(growthMetrics)

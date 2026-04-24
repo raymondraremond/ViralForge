@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     avatar_url TEXT,
     niche TEXT, -- e.g., "AI SaaS", "Fitness Tech"
     monetization_goal DECIMAL(12, 2) DEFAULT 0.00,
-    monetization_status TEXT DEFAULT 'pending', -- 'pending', 'active'
+    is_autonomous BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );

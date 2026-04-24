@@ -16,7 +16,9 @@ export default function DebugPage() {
       const { data: { session }, error: authError } = await supabase.auth.getSession()
       
       // 2. Test API Route (which tests Drizzle)
-      const res = await fetch('/api/metrics?userId=test')
+      // Use the actual session user ID if available, otherwise a valid zero-UUID
+      const testId = session?.user?.id || "00000000-0000-0000-0000-000000000000"
+      const res = await fetch(`/api/metrics?userId=${testId}`)
       const dbData = await res.json()
 
       setStatus({
