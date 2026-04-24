@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/drizzle/db";
+import { db, isDatabaseConfigured } from "@/lib/drizzle/db";
 import { growthMetrics } from "@/lib/drizzle/schema";
 import { desc, eq } from "drizzle-orm";
-import { createClient } from "@/lib/supabase/client"; // Wait, this is server side, should use server client
 
-// Using a simplified version for now since I don't have the server-side supabase client helper easily accessible without checking lib
 export async function GET(req: Request) {
   try {
+    if (!isDatabaseConfigured()) {
+      return NextResponse.json({ message: "Database not configured (demo mode)", data: [] });
+    }
+
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
 
