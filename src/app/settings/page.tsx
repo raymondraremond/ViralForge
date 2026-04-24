@@ -71,34 +71,55 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 3000)
   }
 
+  const [connectingId, setConnectingId] = useState<string | null>(null)
+
   const handleConnect = async (pId: string) => {
     if (!user) return
-    // In production, this initiates OAuth. For now, we simulate success.
-    const handle = `@${user.email?.split('@')[0]}_${pId}`
-    const success = await upsertSocialAccount({
-      userId: user.id,
-      platform: pId,
-      platformUserId: `sim_${Date.now()}`,
-      handle,
-      accessToken: "sim_token",
-      isActive: true
-    })
+    setConnectingId(pId)
+    
+    console.log(`[SETTINGS] Connecting platform: ${pId}`)
 
-    if (success) {
-      setPlatforms(prev => prev.map(p =>
-        p.id === pId ? { ...p, connected: true, handle } : p
-      ))
+    try {
+      // In production, this initiates OAuth. For now, we simulate success.
+      const handle = `@${user.email?.split('@')[0]}_${pId}`
+      const success = await upsertSocialAccount({
+        userId: user.id,
+        platform: pId,
+        platformUserId: `sim_${Date.now()}`,
+        handle,
+        accessToken: "sim_token",
+        isActive: true
+      })
+
+      if (success) {
+        console.log(`[SETTINGS] Successfully connected ${pId}`)
+        setPlatforms(prev => prev.map(p =>
+          p.id === pId ? { ...p, connected: true, handle } : p
+        ))
+      } else {
+        console.error(`[SETTINGS] Failed to connect ${pId}. Is DATABASE_URL set?`)
+        alert("Failed to connect. Please ensure your database is configured in Vercel settings.")
+      }
+    } catch (err) {
+      console.error(`[SETTINGS] Error connecting ${pId}:`, err)
+      alert("An unexpected error occurred while connecting.")
+    } finally {
+      setConnectingId(null)
     }
   }
 
   const handleDisconnect = async (pId: string) => {
     if (!user) return
+    setConnectingId(pId)
     const success = await disconnectSocialAccount(user.id, pId)
     if (success) {
       setPlatforms(prev => prev.map(p =>
         p.id === pId ? { ...p, connected: false, handle: undefined } : p
       ))
+    } else {
+      alert("Failed to disconnect. Please check your connection.")
     }
+    setConnectingId(null)
   }
 
   if (loading) {
@@ -138,12 +159,21 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-1.5 text-green-400 text-xs font-medium">
                       <CheckCircle2 className="w-4 h-4" />Active
                     </div>
-                    <button onClick={() => handleDisconnect(platform.id)} className="text-xs text-muted-foreground hover:text-destructive transition-colors">
-                      Disconnect
+                    <button 
+                      onClick={() => handleDisconnect(platform.id)} 
+                      disabled={!!connectingId}
+                      className="text-xs text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
+                    >
+                      {connectingId === platform.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Disconnect"}
                     </button>
                   </div>
                 ) : (
-                  <button onClick={() => handleConnect(platform.id)} className="px-3 py-1.5 bg-primary/20 text-primary rounded-lg text-xs font-bold hover:bg-primary/30 transition-all">
+                  <button 
+                    onClick={() => handleConnect(platform.id)} 
+                    disabled={!!connectingId}
+                    className="px-3 py-1.5 bg-primary/20 text-primary rounded-lg text-xs font-bold hover:bg-primary/30 transition-all flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {connectingId === platform.id && <Loader2 className="w-3 h-3 animate-spin" />}
                     Connect
                   </button>
                 )}
