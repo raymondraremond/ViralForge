@@ -21,10 +21,15 @@ export default function DebugPage() {
       const res = await fetch(`/api/metrics?userId=${testId}`)
       const dbData = await res.json()
 
+      // 3. Test direct DB connection if possible or just check env
+      const envCheck = await fetch('/api/debug/env')
+      const envData = await envCheck.json()
+
       setStatus({
         auth: authError ? `Error: ${authError.message}` : "Connected",
-        db: dbData.error ? `Error: ${dbData.error}` : "Connected (or Demo Mode)",
+        db: dbData.error ? `Error: ${dbData.error}` : "Connected",
         session: !!session,
+        env: envData,
         rawDb: dbData
       })
     } catch (err: any) {
@@ -73,6 +78,14 @@ export default function DebugPage() {
               <span className="text-sm font-medium">Session Active:</span>
               <span className="text-sm">{status.session ? "Yes" : "No"}</span>
             </div>
+
+            {status.env && (
+              <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl text-xs space-y-1">
+                <p><strong>DB Configured:</strong> {status.env.databaseConfigured ? "✅" : "❌"}</p>
+                <p><strong>DB URL Preview:</strong> {status.env.databaseUrlPreview}</p>
+                <p><strong>Vercel Env:</strong> {status.env.vercelEnv}</p>
+              </div>
+            )}
             
             {status.rawDb?.error && (
               <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 font-mono overflow-auto">
