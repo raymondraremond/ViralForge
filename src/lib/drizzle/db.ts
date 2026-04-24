@@ -20,7 +20,7 @@ function getDb() {
     );
   }
 
-  const client = postgres(url);
+  const client = postgres(url, { ssl: 'require' });
   _db = drizzle(client, { schema });
   return _db;
 }
