@@ -93,7 +93,7 @@ export async function getConnectedAccounts(userId: string) {
 }
 
 export async function upsertSocialAccount(data: any) {
-  if (!isDatabaseConfigured()) return null;
+  if (!isDatabaseConfigured()) return { error: "Database not configured" };
   try {
     // 1. Ensure profile exists first (FK requirement)
     const profile = await db.select().from(profiles).where(eq(profiles.id, data.userId));
@@ -111,14 +111,15 @@ export async function upsertSocialAccount(data: any) {
       .where(and(eq(socialAccounts.userId, data.userId), eq(socialAccounts.platform, data.platform)));
     
     if (existing.length > 0) {
+      // Note: social_accounts table doesn't have an updatedAt column yet
       const result = await db.update(socialAccounts)
-        .set({ ...data, updatedAt: new Date() })
+        .set(data)
         .where(eq(socialAccounts.id, existing[0].id))
         .returning();
-      return result[0];
+      return { data: result[0] };
     } else {
       const result = await db.insert(socialAccounts).values(data).returning();
-      return result[0];
+      return { data: result[0] };
     }
   } catch (e: any) { 
     console.error("[ACTION] upsertSocialAccount error details:", {
@@ -126,7 +127,7 @@ export async function upsertSocialAccount(data: any) {
       code: e.code,
       detail: e.detail
     }); 
-    return null; 
+    return { error: e.message }; 
   }
 }
 

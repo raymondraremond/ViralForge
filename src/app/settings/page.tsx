@@ -82,7 +82,7 @@ export default function SettingsPage() {
     try {
       // In production, this initiates OAuth. For now, we simulate success.
       const handle = `@${user.email?.split('@')[0]}_${pId}`
-      const success = await upsertSocialAccount({
+      const result = await upsertSocialAccount({
         userId: user.id,
         platform: pId,
         platformUserId: `sim_${Date.now()}`,
@@ -91,14 +91,14 @@ export default function SettingsPage() {
         isActive: true
       })
 
-      if (success) {
+      if (result?.data) {
         console.log(`[SETTINGS] Successfully connected ${pId}`)
         setPlatforms(prev => prev.map(p =>
           p.id === pId ? { ...p, connected: true, handle } : p
         ))
       } else {
-        console.error(`[SETTINGS] Failed to connect ${pId}.`)
-        alert("Failed to connect account. Please try again or check the System Diagnostic page for more details.")
+        console.error(`[SETTINGS] Failed to connect ${pId}:`, result?.error)
+        alert(`Failed to connect account: ${result?.error || "Unknown error"}. Please check the System Diagnostic page.`)
       }
     } catch (err) {
       console.error(`[SETTINGS] Error connecting ${pId}:`, err)
