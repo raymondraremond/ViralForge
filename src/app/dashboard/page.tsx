@@ -102,7 +102,9 @@ export default function Dashboard() {
     <div className="p-8 space-y-8 animate-in fade-in duration-700">
       <header className="flex justify-between items-end">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Growth Dashboard</h2>
+          <h2 className="text-3xl font-bold tracking-tight">
+            Welcome back, {user?.user_metadata?.full_name || user?.user_metadata?.name || 'User'}!
+          </h2>
           <p className="text-muted-foreground">Autonomous brain monitoring viral trends in real-time.</p>
         </div>
         <div className="flex gap-3">
