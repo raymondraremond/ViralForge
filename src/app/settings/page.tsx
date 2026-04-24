@@ -31,6 +31,10 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  
+  // Prompt state
+  const [promptPlatform, setPromptPlatform] = useState<Platform | null>(null)
+  const [handleInput, setHandleInput] = useState("")
 
   const supabase = createClient()
 
@@ -73,38 +77,43 @@ export default function SettingsPage() {
 
   const [connectingId, setConnectingId] = useState<string | null>(null)
 
-  const handleConnect = async (pId: string) => {
-    if (!user) return
+  const handleConnectInitiate = (platform: Platform) => {
+    setPromptPlatform(platform)
+    setHandleInput(`@${user.email?.split('@')[0]}`)
+  }
+
+  const handleConnectConfirm = async () => {
+    if (!user || !promptPlatform) return
+    const pId = promptPlatform.id
+    const finalHandle = handleInput.trim() || `@${user.email?.split('@')[0]}_${pId}`
+    
+    setPromptPlatform(null)
     setConnectingId(pId)
     
-    console.log(`[SETTINGS] Connecting platform: ${pId}`)
+    console.log(`[SETTINGS] Connecting platform: ${pId} with handle: ${finalHandle}`)
 
     try {
-      // In production, this initiates OAuth. For now, we simulate success.
-      const handle = `@${user.email?.split('@')[0]}_${pId}`
       const result = await upsertSocialAccount({
         userId: user.id,
         platform: pId,
         platformUserId: `sim_${Date.now()}`,
-        handle,
+        handle: finalHandle,
         accessToken: "sim_token",
         isActive: true
       })
 
       if (result?.data) {
-        console.log(`[SETTINGS] Successfully connected ${pId}`)
         setPlatforms(prev => prev.map(p =>
-          p.id === pId ? { ...p, connected: true, handle } : p
+          p.id === pId ? { ...p, connected: true, handle: finalHandle } : p
         ))
       } else {
-        console.error(`[SETTINGS] Failed to connect ${pId}:`, result?.error)
-        alert(`Failed to connect account: ${result?.error || "Unknown error"}. Please check the System Diagnostic page.`)
+        alert(`Failed to connect account: ${result?.error || "Unknown error"}`)
       }
     } catch (err) {
-      console.error(`[SETTINGS] Error connecting ${pId}:`, err)
       alert("An unexpected error occurred while connecting.")
     } finally {
       setConnectingId(null)
+      setHandleInput("")
     }
   }
 
@@ -124,21 +133,21 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="p-8 flex flex-col items-center justify-center h-[80vh] gap-4">
+      <div className="p-8 flex flex-col items-center justify-center h-[80vh] gap-4 text-center">
         <Loader2 className="w-12 h-12 text-primary animate-spin" />
-        <p className="text-muted-foreground animate-pulse">Loading system settings...</p>
+        <p className="text-muted-foreground animate-pulse">Synchronizing with ViralForge...</p>
       </div>
     )
   }
 
   return (
-    <div className="p-8 space-y-10 animate-in fade-in slide-in-from-right-4 duration-700 max-w-5xl">
-      <header>
-        <h2 className="text-3xl font-bold tracking-tight">System Configuration</h2>
-        <p className="text-muted-foreground">Manage your connections and autonomous growth strategy.</p>
+    <div className="p-4 sm:p-6 md:p-8 space-y-8 sm:space-y-10 animate-in fade-in slide-in-from-right-4 duration-700 max-w-5xl mx-auto">
+      <header className="space-y-2">
+        <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">System Configuration</h2>
+        <p className="text-sm sm:text-base text-muted-foreground">Manage your connections and autonomous growth strategy.</p>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8">
         {/* Social Connections */}
         <div className="space-y-4">
           <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -146,17 +155,17 @@ export default function SettingsPage() {
           </h3>
           <div className="space-y-3">
             {platforms.map((platform) => (
-              <div key={platform.id} className="glass-card p-4 rounded-xl flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-white/5 rounded-lg"><platform.icon className="w-5 h-5" /></div>
-                  <div>
-                    <p className="text-sm font-medium">{platform.name}</p>
-                    <p className="text-xs text-muted-foreground">{platform.connected ? platform.handle : "Not connected"}</p>
+              <div key={platform.id} className="glass-card p-4 rounded-xl flex items-center justify-between gap-2">
+                <div className="flex items-center gap-3 sm:gap-4 overflow-hidden">
+                  <div className="p-2 bg-white/5 rounded-lg shrink-0"><platform.icon className="w-5 h-5" /></div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{platform.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{platform.connected ? platform.handle : "Not connected"}</p>
                   </div>
                 </div>
                 {platform.connected ? (
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5 text-green-400 text-xs font-medium">
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                    <div className="hidden sm:flex items-center gap-1.5 text-green-400 text-xs font-medium">
                       <CheckCircle2 className="w-4 h-4" />Active
                     </div>
                     <button 
@@ -169,9 +178,9 @@ export default function SettingsPage() {
                   </div>
                 ) : (
                   <button 
-                    onClick={() => handleConnect(platform.id)} 
+                    onClick={() => handleConnectInitiate(platform)} 
                     disabled={!!connectingId}
-                    className="px-3 py-1.5 bg-primary/20 text-primary rounded-lg text-xs font-bold hover:bg-primary/30 transition-all flex items-center gap-2 disabled:opacity-50"
+                    className="px-3 py-1.5 bg-primary/20 text-primary rounded-lg text-xs font-bold hover:bg-primary/30 transition-all flex items-center gap-2 disabled:opacity-50 shrink-0"
                   >
                     {connectingId === platform.id && <Loader2 className="w-3 h-3 animate-spin" />}
                     Connect
@@ -187,7 +196,7 @@ export default function SettingsPage() {
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <Target className="w-4 h-4 text-purple-400" />Monetization Goals
           </h3>
-          <div className="glass-card p-6 rounded-2xl space-y-6">
+          <div className="glass-card p-4 sm:p-6 rounded-2xl space-y-6">
             <div>
               <label className="text-sm font-medium text-muted-foreground mb-2 block">Monthly Revenue Goal</label>
               <div className="relative">
@@ -227,7 +236,7 @@ export default function SettingsPage() {
                   <p className={`font-bold ${antiFlagging ? 'text-primary' : 'text-muted-foreground'}`}>
                     <Shield className="w-3 h-3 inline mr-1" />Human-like Variations
                   </p>
-                  <p className="text-muted-foreground">Randomizes post times and metadata.</p>
+                  <p className="text-muted-foreground hidden sm:block">Randomizes post times and metadata.</p>
                 </div>
                 <div className={`w-10 h-5 rounded-full relative transition-colors ${antiFlagging ? 'bg-primary' : 'bg-white/20'}`}>
                   <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${antiFlagging ? 'right-1' : 'left-1'}`} />
@@ -246,6 +255,48 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {/* Handle Input Prompt Overlay */}
+      {promptPlatform && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="glass-card w-full max-w-md p-6 rounded-2xl shadow-2xl border-primary/30 animate-in zoom-in-95 duration-300">
+            <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+              Connect {promptPlatform.name}
+            </h3>
+            <p className="text-sm text-muted-foreground mb-6">Enter your account handle or profile ID to link with ViralForge.</p>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Account Handle</label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={handleInput}
+                  onChange={e => setHandleInput(e.target.value)}
+                  placeholder="@username"
+                  onKeyDown={e => e.key === 'Enter' && handleConnectConfirm()}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-primary/50 outline-none transition-all font-mono"
+                />
+              </div>
+              
+              <div className="flex gap-3 pt-2">
+                <button 
+                  onClick={() => setPromptPlatform(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-white/10 text-sm font-medium hover:bg-white/5 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleConnectConfirm}
+                  className="flex-1 py-2.5 bg-primary rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all"
+                >
+                  Confirm Connection
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
