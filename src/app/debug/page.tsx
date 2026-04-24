@@ -88,8 +88,11 @@ export default function DebugPage() {
             )}
             
             {status.rawDb?.error && (
-              <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 font-mono overflow-auto">
-                <strong>Raw DB Error:</strong> {JSON.stringify(status.rawDb.error)}
+              <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 font-mono overflow-auto space-y-2">
+                <p><strong>Raw DB Error:</strong> {JSON.stringify(status.rawDb.error)}</p>
+                {status.rawDb.code && <p><strong>Code:</strong> {status.rawDb.code}</p>}
+                {status.rawDb.detail && <p><strong>Detail:</strong> {status.rawDb.detail}</p>}
+                {status.rawDb.hint && <p><strong>Hint:</strong> {status.rawDb.hint}</p>}
               </div>
             )}
           </div>

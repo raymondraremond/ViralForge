@@ -33,6 +33,12 @@ export async function GET(req: Request) {
     return NextResponse.json(latestMetrics);
   } catch (error: any) {
     console.error("[METRICS_API_ERROR]:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ 
+      error: error.message,
+      code: error.code,
+      detail: error.detail,
+      hint: error.hint,
+      internalQuery: error.query
+    }, { status: 500 });
   }
 }
