@@ -7,7 +7,6 @@ export const profiles = pgTable("profiles", {
   avatarUrl: text("avatar_url"),
   niche: text("niche"),
   monetizationGoal: decimal("monetization_goal", { precision: 12, scale: 2 }).default("0.00"),
-  monetizationStatus: text("monetization_status").default("pending"),
   isAutonomous: boolean("is_autonomous").default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

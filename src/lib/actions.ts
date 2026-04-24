@@ -14,15 +14,27 @@ import { eq, desc, and } from "drizzle-orm"
 export async function getProfile(userId: string) {
   if (!isDatabaseConfigured()) return null;
   try {
-    const result = await db.select().from(profiles).where(eq(profiles.id, userId));
+    const result = await db.select({
+      id: profiles.id,
+      fullName: profiles.fullName,
+      avatarUrl: profiles.avatarUrl,
+      niche: profiles.niche,
+      monetizationGoal: profiles.monetizationGoal,
+      isAutonomous: profiles.isAutonomous,
+      createdAt: profiles.createdAt,
+      updatedAt: profiles.updatedAt
+    }).from(profiles).where(eq(profiles.id, userId));
     return result[0] || null;
-  } catch { return null; }
+  } catch (e: any) {
+    console.error("[ACTION] getProfile error:", e.message);
+    return null;
+  }
 }
 
 export async function upsertProfile(userId: string, data: { fullName?: string; niche?: string; monetizationGoal?: string; isAutonomous?: boolean }) {
   if (!isDatabaseConfigured()) return null;
   try {
-    const existing = await db.select().from(profiles).where(eq(profiles.id, userId));
+    const existing = await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.id, userId));
     if (existing.length > 0) {
       const result = await db.update(profiles)
         .set({ ...data, updatedAt: new Date() })
@@ -39,7 +51,7 @@ export async function upsertProfile(userId: string, data: { fullName?: string; n
     console.error("[ACTION] upsertProfile error details:", {
       message: e.message,
       code: e.code,
-      stack: e.stack
+      detail: e.detail
     }); 
     return null; 
   }
@@ -96,7 +108,7 @@ export async function upsertSocialAccount(data: any) {
   if (!isDatabaseConfigured()) return { error: "Database not configured" };
   try {
     // 1. Ensure profile exists first (FK requirement)
-    const profile = await db.select().from(profiles).where(eq(profiles.id, data.userId));
+    const profile = await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.id, data.userId));
     if (profile.length === 0) {
       console.log(`[ACTION] Creating missing profile for ${data.userId} before connecting account`);
       await db.insert(profiles).values({
@@ -106,7 +118,7 @@ export async function upsertSocialAccount(data: any) {
     }
 
     // 2. Now upsert the social account
-    const existing = await db.select()
+    const existing = await db.select({ id: socialAccounts.id })
       .from(socialAccounts)
       .where(and(eq(socialAccounts.userId, data.userId), eq(socialAccounts.platform, data.platform)));
     
