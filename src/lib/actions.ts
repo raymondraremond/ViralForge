@@ -3,6 +3,7 @@
 import { db, isDatabaseConfigured } from "@/lib/drizzle/db"
 import { profiles, contentItems, socialAccounts, trends, growthMetrics } from "@/lib/drizzle/schema"
 import { eq, desc, and } from "drizzle-orm"
+import { createClient } from "@/lib/supabase/server"
 
 /**
  * ACTIONS: VIRALFORGE DATA PERSISTENCE
@@ -105,41 +106,41 @@ export async function getConnectedAccounts(userId: string) {
 }
 
 export async function upsertSocialAccount(data: any) {
-  if (!isDatabaseConfigured()) return { error: "Database not configured" };
+  const supabase = await createClient();
+  
   try {
-    // 1. Ensure profile exists first (FK requirement)
-    const profile = await db.select({ id: profiles.id }).from(profiles).where(eq(profiles.id, data.userId));
-    if (profile.length === 0) {
-      console.log(`[ACTION] Creating missing profile for ${data.userId} before connecting account`);
-      await db.insert(profiles).values({
-        id: data.userId,
-        updatedAt: new Date()
-      });
+    // 1. Ensure profile exists (using supabase client for reliability)
+    const { data: profile, error: profileErr } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', data.userId)
+      .single();
+
+    if (!profile) {
+      console.log(`[ACTION] Creating missing profile for ${data.userId}`);
+      await supabase.from('profiles').insert({ id: data.userId, updated_at: new Date().toISOString() });
     }
 
-    // 2. Now upsert the social account
-    const existing = await db.select({ id: socialAccounts.id })
-      .from(socialAccounts)
-      .where(and(eq(socialAccounts.userId, data.userId), eq(socialAccounts.platform, data.platform)));
-    
-    if (existing.length > 0) {
-      // Note: social_accounts table doesn't have an updatedAt column yet
-      const result = await db.update(socialAccounts)
-        .set(data)
-        .where(eq(socialAccounts.id, existing[0].id))
-        .returning();
-      return { data: result[0] };
-    } else {
-      const result = await db.insert(socialAccounts).values(data).returning();
-      return { data: result[0] };
-    }
+    // 2. Upsert social account
+    const { data: result, error } = await supabase
+      .from('social_accounts')
+      .upsert({
+        user_id: data.userId,
+        platform: data.platform,
+        platform_user_id: data.platformUserId,
+        handle: data.handle,
+        access_token: data.accessToken,
+        is_active: data.isActive,
+        metadata: data.metadata || {}
+      }, { onConflict: 'user_id,platform,platform_user_id' })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { data: result };
   } catch (e: any) { 
-    console.error("[ACTION] upsertSocialAccount error details:", {
-      message: e.message,
-      code: e.code,
-      detail: e.detail
-    }); 
-    return { error: e.message }; 
+    console.error("[ACTION] upsertSocialAccount error details:", e); 
+    return { error: e.message || "Failed to upsert social account" }; 
   }
 }
 
