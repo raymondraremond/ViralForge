@@ -95,9 +95,26 @@ export async function getConnectedAccounts(userId: string) {
 export async function upsertSocialAccount(data: any) {
   if (!isDatabaseConfigured()) return null;
   try {
-    const existing = await db.select().from(socialAccounts).where(and(eq(socialAccounts.userId, data.userId), eq(socialAccounts.platform, data.platform)));
+    // 1. Ensure profile exists first (FK requirement)
+    const profile = await db.select().from(profiles).where(eq(profiles.id, data.userId));
+    if (profile.length === 0) {
+      console.log(`[ACTION] Creating missing profile for ${data.userId} before connecting account`);
+      await db.insert(profiles).values({
+        id: data.userId,
+        updatedAt: new Date()
+      });
+    }
+
+    // 2. Now upsert the social account
+    const existing = await db.select()
+      .from(socialAccounts)
+      .where(and(eq(socialAccounts.userId, data.userId), eq(socialAccounts.platform, data.platform)));
+    
     if (existing.length > 0) {
-      const result = await db.update(socialAccounts).set(data).where(eq(socialAccounts.id, existing[0].id)).returning();
+      const result = await db.update(socialAccounts)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(socialAccounts.id, existing[0].id))
+        .returning();
       return result[0];
     } else {
       const result = await db.insert(socialAccounts).values(data).returning();
@@ -107,8 +124,7 @@ export async function upsertSocialAccount(data: any) {
     console.error("[ACTION] upsertSocialAccount error details:", {
       message: e.message,
       code: e.code,
-      detail: e.detail,
-      stack: e.stack
+      detail: e.detail
     }); 
     return null; 
   }

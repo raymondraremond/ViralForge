@@ -97,8 +97,8 @@ export default function SettingsPage() {
           p.id === pId ? { ...p, connected: true, handle } : p
         ))
       } else {
-        console.error(`[SETTINGS] Failed to connect ${pId}. Is DATABASE_URL set?`)
-        alert("Failed to connect. Please ensure your database is configured in Vercel settings.")
+        console.error(`[SETTINGS] Failed to connect ${pId}.`)
+        alert("Failed to connect account. Please try again or check the System Diagnostic page for more details.")
       }
     } catch (err) {
       console.error(`[SETTINGS] Error connecting ${pId}:`, err)
