@@ -21,30 +21,36 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    console.log('[LOGIN] Attempting email login for:', email)
 
-    if (error) {
-      setError(error.message)
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
+
+      if (error) {
+        console.error('[LOGIN] Email sign-in error:', error)
+        setError(error.message)
+        setLoading(false)
+      } else {
+        console.log('[LOGIN] Sign-in successful:', data.user?.id)
+        router.push("/dashboard")
+        router.refresh()
+      }
+    } catch (err: any) {
+      console.error('[LOGIN] Unexpected error during email sign-in:', err)
+      setError(err.message || "An unexpected error occurred.")
       setLoading(false)
-    } else {
-      router.push("/dashboard")
-      router.refresh()
     }
   }
 
   const handleOAuthLogin = async (provider: 'github' | 'google') => {
     try {
-      // Check if keys are actually present before trying
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-      if (!url || !key) {
-        setError("Supabase configuration is missing. Please check your environment variables.");
-        return;
-      }
+      setLoading(true)
+      setError(null)
+      
+      console.log(`[LOGIN] Initiating OAuth login for: ${provider}`)
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -54,10 +60,14 @@ export default function LoginPage() {
       })
 
       if (error) {
+        console.error(`[LOGIN] ${provider} sign-in error:`, error)
         setError(error.message);
+        setLoading(false)
       }
     } catch (err: any) {
+      console.error(`[LOGIN] Unexpected error during ${provider} sign-in:`, err)
       setError(err.message || "An unexpected error occurred during login.");
+      setLoading(false)
     }
   }
 
