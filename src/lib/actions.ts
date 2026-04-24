@@ -35,7 +35,14 @@ export async function upsertProfile(userId: string, data: { fullName?: string; n
         .returning();
       return result[0];
     }
-  } catch (e) { console.error("[ACTION] upsertProfile error:", e); return null; }
+  } catch (e: any) { 
+    console.error("[ACTION] upsertProfile error details:", {
+      message: e.message,
+      code: e.code,
+      stack: e.stack
+    }); 
+    return null; 
+  }
 }
 
 // ==================== CONTENT ITEMS ====================
@@ -96,7 +103,15 @@ export async function upsertSocialAccount(data: any) {
       const result = await db.insert(socialAccounts).values(data).returning();
       return result[0];
     }
-  } catch (e) { console.error("[ACTION] upsertSocialAccount error:", e); return null; }
+  } catch (e: any) { 
+    console.error("[ACTION] upsertSocialAccount error details:", {
+      message: e.message,
+      code: e.code,
+      detail: e.detail,
+      stack: e.stack
+    }); 
+    return null; 
+  }
 }
 
 export async function disconnectSocialAccount(userId: string, platform: string) {

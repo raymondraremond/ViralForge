@@ -62,7 +62,15 @@ export async function middleware(request: NextRequest) {
 
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser()
+
+  console.log('[MIDDLEWARE] User Check:', {
+    hasUser: !!user,
+    email: user?.email,
+    pathname,
+    error: userError?.message
+  })
 
   if (!user) {
     const url = request.nextUrl.clone()
