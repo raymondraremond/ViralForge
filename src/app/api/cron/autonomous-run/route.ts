@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/drizzle/db";
-import { profiles } from "@/lib/drizzle/schema";
+import { profiles, socialAccounts } from "@/lib/drizzle/schema";
 import { eq } from "drizzle-orm";
 
 /**

@@ -81,11 +81,26 @@ export default function Dashboard() {
   }
 
   const handleForceAIRun = async () => {
+    if (!user) return
     setAiRunning(true)
     try {
-      await fetch("/api/ai/scan")
-      if (user) await fetchData(user.id)
-    } catch { /* keys not set yet */ }
+      const niche = user.user_metadata?.niche || "AI & Technology"
+      
+      // 1. Scan for trends with specific niche
+      await fetch(`/api/ai/scan?niche=${encodeURIComponent(niche)}&live=true`)
+      
+      // 2. Sync social metrics
+      await fetch("/api/social/sync-metrics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id })
+      })
+
+      // 3. Refresh dashboard data
+      await fetchData(user.id)
+    } catch (e) {
+      console.error("Force AI run failed", e)
+    }
     setAiRunning(false)
   }
 

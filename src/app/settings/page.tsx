@@ -13,6 +13,7 @@ type Platform = {
   connected: boolean;
   handle?: string;
   dbId?: string;
+  webhookUrl?: string;
 }
 
 const platformsList: Platform[] = [
@@ -36,6 +37,7 @@ export default function SettingsPage() {
   // Prompt state
   const [promptPlatform, setPromptPlatform] = useState<Platform | null>(null)
   const [handleInput, setHandleInput] = useState("")
+  const [webhookInput, setWebhookInput] = useState("")
 
   const supabase = createClient()
 
@@ -69,9 +71,9 @@ export default function SettingsPage() {
       setPlatforms(platformsList.map(p => {
         const account = accounts.find((a: any) => a.platform === p.id)
         if (account) {
-          return { ...p, connected: true, handle: account.handle, dbId: account.id }
+          return { ...p, connected: true, handle: account.handle, dbId: account.id, webhookUrl: account.webhookUrl }
         }
-        return { ...p, connected: false, handle: undefined, dbId: undefined }
+        return { ...p, connected: false, handle: undefined, dbId: undefined, webhookUrl: undefined }
       }))
     } catch (e) {
       console.error("[SETTINGS] Failed to load accounts:", e)
@@ -94,7 +96,8 @@ export default function SettingsPage() {
 
   const handleConnectInitiate = (platform: Platform) => {
     setPromptPlatform(platform)
-    setHandleInput(`@${user.email?.split('@')[0] || 'user'}`)
+    setHandleInput(platform.handle || `@${user.email?.split('@')[0] || 'user'}`)
+    setWebhookInput(platform.webhookUrl || "")
   }
 
   const handleConnectConfirm = async () => {
@@ -114,7 +117,8 @@ export default function SettingsPage() {
         platformUserId: `${pId}_${user.id.substring(0, 8)}`,
         handle: finalHandle,
         accessToken: `vf_token_${Date.now()}`,
-        isActive: true
+        isActive: true,
+        webhookUrl: webhookInput.trim() || null
       })
 
       if (result?.data) {
@@ -309,6 +313,21 @@ export default function SettingsPage() {
                   onKeyDown={e => e.key === 'Enter' && handleConnectConfirm()}
                   className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-primary/50 outline-none transition-all font-mono"
                 />
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-muted-foreground mb-1.5 flex justify-between">
+                  <span>Posting Webhook URL (Optional)</span>
+                  <a href="https://zapier.com" target="_blank" rel="noreferrer" className="text-primary hover:underline">Get from Zapier</a>
+                </label>
+                <input
+                  type="text"
+                  value={webhookInput}
+                  onChange={e => setWebhookInput(e.target.value)}
+                  placeholder="https://hooks.zapier.com/..."
+                  className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-white focus:border-primary/50 outline-none transition-all text-xs"
+                />
+                <p className="text-[10px] text-muted-foreground mt-1">Paste your Zapier/Make webhook here to enable real posting on the free tier.</p>
               </div>
               
               <div className="flex gap-3 pt-2">

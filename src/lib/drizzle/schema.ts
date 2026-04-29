@@ -23,6 +23,7 @@ export const socialAccounts = pgTable("social_accounts", {
   refreshToken: text("refresh_token"),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   isActive: boolean("is_active").default(true),
+  webhookUrl: text("webhook_url"),
   metadata: jsonb("metadata").default({}),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => ({

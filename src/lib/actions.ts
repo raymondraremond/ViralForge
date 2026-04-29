@@ -3,6 +3,7 @@
 import { db, isDatabaseConfigured } from "@/lib/drizzle/db"
 import { profiles, contentItems, socialAccounts, trends, growthMetrics } from "@/lib/drizzle/schema"
 import { eq, desc, and } from "drizzle-orm"
+import { ApifyService } from "@/lib/social/apify"
 
 /**
  * ACTIONS: VIRALFORGE DATA PERSISTENCE
@@ -130,6 +131,7 @@ export async function upsertSocialAccount(data: {
   handle: string;
   accessToken: string;
   isActive: boolean;
+  webhookUrl?: string | null;
   metadata?: any;
 }) {
   if (!isDatabaseConfigured()) return { error: "Database not configured" };
@@ -167,6 +169,7 @@ export async function upsertSocialAccount(data: {
           accessToken: data.accessToken,
           platformUserId: data.platformUserId,
           isActive: data.isActive,
+          webhookUrl: data.webhookUrl,
           metadata: data.metadata || {}
         })
         .where(eq(socialAccounts.id, existing[0].id))
@@ -181,6 +184,7 @@ export async function upsertSocialAccount(data: {
           handle: data.handle,
           accessToken: data.accessToken,
           isActive: data.isActive ?? true,
+          webhookUrl: data.webhookUrl,
           metadata: data.metadata || {}
         })
         .returning();
@@ -309,13 +313,32 @@ export async function postContentToSocial(contentId: string, userId: string) {
       };
     }
 
+    // Call ApifyService to "post"
+    const apify = new ApifyService();
+    const postResult = await apify.postToSocial(
+      targetAccount.platform, 
+      targetAccount.handle, 
+      {
+        title: item.title,
+        caption: (item.aiMetadata as any)?.caption,
+        hashtags: (item.aiMetadata as any)?.hashtags,
+        voiceover: item.scriptContent,
+        mediaType: item.mediaType
+      },
+      targetAccount.webhookUrl
+    );
+
+    if (!postResult.success) {
+      return { success: false, error: postResult.error };
+    }
+
     // Update content item with posting status
     await db.update(contentItems)
       .set({ 
         status: "posted",
         postedAt: new Date(),
         socialAccountId: targetAccount.id,
-        platformPostId: `post_${Date.now()}_${targetAccount.platform}`
+        platformPostId: postResult.postId
       })
       .where(eq(contentItems.id, contentId));
 
@@ -323,7 +346,8 @@ export async function postContentToSocial(contentId: string, userId: string) {
       platform: targetAccount.platform,
       handle: targetAccount.handle,
       status: "posted",
-      postedAt: new Date().toISOString()
+      postedAt: new Date().toISOString(),
+      postId: postResult.postId
     };
 
     return { 

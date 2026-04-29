@@ -3,6 +3,7 @@ import { OpenAI } from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/drizzle/db";
 import { trends as trendsTable } from "@/lib/drizzle/schema";
+import { ApifyService } from "@/lib/social/apify";
 
 /**
  * VIRALBRAIN: The Autonomous Growth Engine
@@ -130,13 +131,19 @@ export class ViralBrain {
 
   /**
    * Agent 1: Trend Analyst
-   * Uses AI to discover current viral trends for the given niche/platform.
-   * No external scrapers needed — works purely with AI knowledge.
+   * Uses AI to discover current viral trends, supplemented by real Apify data if available.
    */
   async analyzeTrends(niche: string, platform: string): Promise<any[]> {
     console.log(`[BRAIN] Analyzing trends for "${niche}" on ${platform}...`);
     
+    // Attempt real scraping first
+    const apify = new ApifyService();
+    const scrapedTrends = await apify.scrapeTrends(niche, platform);
+    
     const trendPrompt = `You are an expert social media trend analyst. Analyze the CURRENT viral trends for the niche "${niche}" on ${platform} as of today.
+
+${scrapedTrends.length > 0 ? `Here is some real-time scraped data to inform your analysis:
+${JSON.stringify(scrapedTrends.slice(0, 5), null, 2)}` : "No real-time data available, use your internal knowledge."}
 
 Think about what kinds of content are going viral right now on ${platform} in the ${niche} space. Consider:
 - Popular hashtags and challenges
