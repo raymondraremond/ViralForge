@@ -16,6 +16,10 @@ export async function middleware(request: NextRequest) {
     PUBLIC_ROUTES.some(route => pathname === route) ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/api/ai') ||
+    pathname.startsWith('/api/social') ||
+    pathname.startsWith('/api/trends') ||
+    pathname.startsWith('/api/metrics') ||
+    pathname.startsWith('/api/cron') ||
     pathname.includes('.')
   ) {
     return NextResponse.next()

@@ -1,8 +1,12 @@
 {
   "crons": [
     {
-      "path": "/api/ai/generate",
-      "schedule": "0 0 * * *"
+      "path": "/api/cron/autonomous-run",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/post-scheduled",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

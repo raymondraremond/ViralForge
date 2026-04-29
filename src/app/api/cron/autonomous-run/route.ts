@@ -27,22 +27,34 @@ export async function GET(req: Request) {
     
     for (const profile of autoProfiles) {
       try {
-        // Trigger the internal generate logic
-        // We call the local API route or the service directly
-        // For simplicity, we'll assume a POST to our own generate endpoint
-        const res = await fetch(`${new URL(req.url).origin}/api/ai/generate`, {
-          method: "POST",
-          body: JSON.stringify({
-            userId: profile.id,
-            niche: profile.niche || "AI & Tech",
-            platform: "tiktok", // Defaulting to TikTok for auto-runs
-            isAutonomous: true
-          })
-        });
-        const data = await res.json();
-        results.push({ userId: profile.id, status: data.success ? "success" : "failed" });
-      } catch (err) {
-        results.push({ userId: profile.id, status: "error", error: err });
+        // Find connected accounts for this profile to know which platforms to target
+        const accounts = await db.select().from(socialAccounts).where(eq(socialAccounts.userId, profile.id));
+        
+        // If no accounts connected, default to TikTok as a placeholder or skip
+        const platformsToTarget = accounts.length > 0 
+          ? accounts.map(a => a.platform) 
+          : ["tiktok"];
+
+        for (const platform of platformsToTarget) {
+          console.log(`[CRON]: Triggering generation for user ${profile.id} on ${platform}`);
+          
+          // Trigger the internal generate logic
+          const res = await fetch(`${new URL(req.url).origin}/api/ai/generate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: profile.id,
+              niche: profile.niche || "AI & Tech",
+              platform: platform,
+              isAutonomous: true
+            })
+          });
+          
+          const data = await res.json();
+          results.push({ userId: profile.id, platform, status: data.success ? "success" : "failed" });
+        }
+      } catch (err: any) {
+        results.push({ userId: profile.id, status: "error", error: err.message });
       }
     }
 

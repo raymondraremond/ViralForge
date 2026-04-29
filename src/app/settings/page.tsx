@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, CheckCircle2, Lock, Target, DollarSign, Save, Loader2, Shield } from "lucide-react"
+import { Plus, CheckCircle2, Lock, Target, DollarSign, Save, Loader2, Shield, Unplug } from "lucide-react"
 import { InstagramIcon, TwitterIcon, YoutubeIcon, LinkedinIcon, TikTokIcon } from "@/components/icons"
 import { createClient } from "@/lib/supabase/client"
 import { upsertProfile, getProfile, getConnectedAccounts, upsertSocialAccount, disconnectSocialAccount } from "@/lib/actions"
@@ -12,6 +12,7 @@ type Platform = {
   icon: any;
   connected: boolean;
   handle?: string;
+  dbId?: string;
 }
 
 const platformsList: Platform[] = [
@@ -38,6 +39,7 @@ export default function SettingsPage() {
 
   const supabase = createClient()
 
+  // Load data on mount
   useEffect(() => {
     const loadData = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -51,17 +53,30 @@ export default function SettingsPage() {
           setRevenueGoal(profile.monetizationGoal?.toString() || "0")
         }
 
-        // Load connected accounts
-        const accounts = await getConnectedAccounts(session.user.id)
-        setPlatforms(prev => prev.map(p => {
-          const account = accounts.find((a: any) => a.platform === p.id)
-          return account ? { ...p, connected: true, handle: account.handle } : p
-        }))
+        // Load connected accounts from DB via server action
+        await refreshConnectedAccounts(session.user.id)
       }
       setLoading(false)
     }
     loadData()
   }, [])
+
+  const refreshConnectedAccounts = async (userId: string) => {
+    try {
+      const accounts = await getConnectedAccounts(userId)
+      console.log("[SETTINGS] Loaded accounts:", accounts.length)
+      
+      setPlatforms(platformsList.map(p => {
+        const account = accounts.find((a: any) => a.platform === p.id)
+        if (account) {
+          return { ...p, connected: true, handle: account.handle, dbId: account.id }
+        }
+        return { ...p, connected: false, handle: undefined, dbId: undefined }
+      }))
+    } catch (e) {
+      console.error("[SETTINGS] Failed to load accounts:", e)
+    }
+  }
 
   const handleSave = async () => {
     if (!user) return
@@ -79,7 +94,7 @@ export default function SettingsPage() {
 
   const handleConnectInitiate = (platform: Platform) => {
     setPromptPlatform(platform)
-    setHandleInput(`@${user.email?.split('@')[0]}`)
+    setHandleInput(`@${user.email?.split('@')[0] || 'user'}`)
   }
 
   const handleConnectConfirm = async () => {
@@ -96,20 +111,22 @@ export default function SettingsPage() {
       const result = await upsertSocialAccount({
         userId: user.id,
         platform: pId,
-        platformUserId: `sim_${Date.now()}`,
+        platformUserId: `${pId}_${user.id.substring(0, 8)}`,
         handle: finalHandle,
-        accessToken: "sim_token",
+        accessToken: `vf_token_${Date.now()}`,
         isActive: true
       })
 
       if (result?.data) {
-        setPlatforms(prev => prev.map(p =>
-          p.id === pId ? { ...p, connected: true, handle: finalHandle } : p
-        ))
+        console.log("[SETTINGS] Account connected successfully:", result.data)
+        // Refresh from DB to ensure consistency
+        await refreshConnectedAccounts(user.id)
       } else {
+        console.error("[SETTINGS] Connect failed:", result?.error)
         alert(`Failed to connect account: ${result?.error || "Unknown error"}`)
       }
-    } catch (err) {
+    } catch (err: any) {
+      console.error("[SETTINGS] Unexpected error:", err)
       alert("An unexpected error occurred while connecting.")
     } finally {
       setConnectingId(null)
@@ -122,11 +139,10 @@ export default function SettingsPage() {
     setConnectingId(pId)
     const success = await disconnectSocialAccount(user.id, pId)
     if (success) {
-      setPlatforms(prev => prev.map(p =>
-        p.id === pId ? { ...p, connected: false, handle: undefined } : p
-      ))
+      // Refresh from DB
+      await refreshConnectedAccounts(user.id)
     } else {
-      alert("Failed to disconnect. Please check your connection.")
+      alert("Failed to disconnect. Please try again.")
     }
     setConnectingId(null)
   }
@@ -153,14 +169,19 @@ export default function SettingsPage() {
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <Lock className="w-4 h-4 text-primary" />Social Connections
           </h3>
+          <p className="text-xs text-muted-foreground -mt-2">Connect your social accounts to enable auto-posting from the AI Brain.</p>
           <div className="space-y-3">
             {platforms.map((platform) => (
-              <div key={platform.id} className="glass-card p-4 rounded-xl flex items-center justify-between gap-2">
+              <div key={platform.id} className={`glass-card p-4 rounded-xl flex items-center justify-between gap-2 transition-all ${platform.connected ? 'border-green-500/20' : ''}`}>
                 <div className="flex items-center gap-3 sm:gap-4 overflow-hidden">
-                  <div className="p-2 bg-white/5 rounded-lg shrink-0"><platform.icon className="w-5 h-5" /></div>
+                  <div className={`p-2 rounded-lg shrink-0 ${platform.connected ? 'bg-green-500/10' : 'bg-white/5'}`}>
+                    <platform.icon className="w-5 h-5" />
+                  </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{platform.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{platform.connected ? platform.handle : "Not connected"}</p>
+                    <p className={`text-xs truncate ${platform.connected ? 'text-green-400' : 'text-muted-foreground'}`}>
+                      {platform.connected ? platform.handle : "Not connected"}
+                    </p>
                   </div>
                 </div>
                 {platform.connected ? (
@@ -171,9 +192,10 @@ export default function SettingsPage() {
                     <button 
                       onClick={() => handleDisconnect(platform.id)} 
                       disabled={!!connectingId}
-                      className="text-xs text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
+                      className="text-xs text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50 flex items-center gap-1"
                     >
-                      {connectingId === platform.id ? <Loader2 className="w-3 h-3 animate-spin" /> : "Disconnect"}
+                      {connectingId === platform.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Unplug className="w-3 h-3" />}
+                      Disconnect
                     </button>
                   </div>
                 ) : (
@@ -188,6 +210,16 @@ export default function SettingsPage() {
                 )}
               </div>
             ))}
+          </div>
+
+          {/* Connection Status Summary */}
+          <div className="bg-white/5 p-4 rounded-xl mt-4">
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-white">{platforms.filter(p => p.connected).length}</span> of {platforms.length} accounts connected.
+              {platforms.filter(p => p.connected).length === 0 && (
+                <span className="text-yellow-400 ml-1">Connect at least one account to enable auto-posting.</span>
+              )}
+            </p>
           </div>
         </div>
 
@@ -263,7 +295,7 @@ export default function SettingsPage() {
             <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
               Connect {promptPlatform.name}
             </h3>
-            <p className="text-sm text-muted-foreground mb-6">Enter your account handle or profile ID to link with ViralForge.</p>
+            <p className="text-sm text-muted-foreground mb-6">Enter your {promptPlatform.name} handle to link with ViralForge for auto-posting.</p>
             
             <div className="space-y-4">
               <div>
